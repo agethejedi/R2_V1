@@ -7,7 +7,7 @@
     {
       "binding": "DB",
       "database_name": "bot_db",
-      "database_id": "REPLACE_WITH_D1_ID"
+      "database_id": "bot_db"
     }
   ],
   "durable_objects": {

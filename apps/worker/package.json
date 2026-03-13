@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "build": "wrangler deploy",
+    "build": "wrangler deploy --dry-run",
     "lint": "echo lint worker"
   },
   "dependencies": {

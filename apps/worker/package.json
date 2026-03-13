@@ -1,0 +1,21 @@
+{
+  "name": "@bot/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run",
+    "lint": "echo lint worker"
+  },
+  "dependencies": {
+    "hono": "^4.6.10",
+    "jose": "^5.9.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250303.0",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.7.1"
+  }
+}

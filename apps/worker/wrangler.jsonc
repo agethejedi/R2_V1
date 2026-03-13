@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "iotx-coinbase-bot-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-13",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bot_db",
+      "database_id": "REPLACE_WITH_D1_ID"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "BOT_DO",
+        "class_name": "BotDurableObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["BotDurableObject"]
+    }
+  ],
+  "vars": {
+    "DEFAULT_ASSET": "ETH-USD",
+    "TRADING_MODE": "paper",
+    "LIVE_TRADING_ENABLED": "false"
+  }
+}

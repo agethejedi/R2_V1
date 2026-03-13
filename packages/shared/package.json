@@ -1,0 +1,6 @@
+{
+  "name": "@bot/shared",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}

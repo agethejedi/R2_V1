@@ -1,0 +1,12 @@
+{
+  "name": "iotx-cloudflare-bot-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @bot/worker && npm run build -w @bot/web",
+    "lint": "npm run lint -w @bot/worker && npm run lint -w @bot/web"
+  }
+}

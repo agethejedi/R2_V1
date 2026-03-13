@@ -10,3 +10,4 @@
     "lint": "npm run lint -w @bot/worker && npm run lint -w @bot/web"
   }
 }
+

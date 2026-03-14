@@ -7,7 +7,7 @@
     {
       "binding": "DB",
       "database_name": "bot_db",
-      "database_id": "bot_db"
+      "database_id": "4bedd7b7-cc69-4b0d-8cda-5334b9e6b8c6"
     }
   ],
   "durable_objects": {

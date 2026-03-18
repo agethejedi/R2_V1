@@ -78,8 +78,8 @@ export class BotDurableObject extends DurableObject<Env> {
     }
 
     if (url.pathname.endsWith('/status') && request.method === 'GET') {
-      return Response.json(this.stateData.lastStatus ?? (await this.tick()));
-    }
+  return Response.json(await this.tick());
+}
 
     if (url.pathname.endsWith('/trade') && request.method === 'POST') {
       const body = await request.json<{ side: 'BUY' | 'SELL'; notionalUsd: number }>();

@@ -22,6 +22,7 @@ type CoinbaseBestBidAskResponse = {
 
 async function fetchBestBidAsk(productId: string) {
   const url = `https://api.coinbase.com/api/v3/brokerage/best_bid_ask?product_ids=${encodeURIComponent(productId)}`;
+
   const res = await fetch(url, {
     method: 'GET',
     headers: {
@@ -64,19 +65,18 @@ async function fetchBenchmarkPrice(productId: 'BTC-USD' | 'ETH-USD') {
 }
 
 export async function fetchPublicTicker(asset: Asset): Promise<TickerSnapshot> {
-  const price = asset === 'ETH-USD' ? 9999 : 0.123456;
+  const book = await fetchBestBidAsk(asset);
+  const price = (book.bestBid + book.bestAsk) / 2;
 
-  return {
-    productId: asset,
-    price,
-    bestBid: price * 0.9995,
-    bestAsk: price * 1.0005,
-    bidDepth: 11111,
-    askDepth: 9999,
-    benchmarkPrice: 12345,
-    timestamp: new Date().toISOString()
-  };
-}
+  const benchmarkAsset: 'BTC-USD' | 'ETH-USD' =
+    asset === 'ETH-USD' ? 'BTC-USD' : 'ETH-USD';
+
+  let benchmarkPrice = price;
+  try {
+    benchmarkPrice = await fetchBenchmarkPrice(benchmarkAsset);
+  } catch {
+    benchmarkPrice = asset === 'ETH-USD' ? 60000 : 3500;
+  }
 
   return {
     productId: asset,
@@ -110,8 +110,5 @@ export async function placeCoinbaseOrder(params: {
     };
   }
 
-  // Live trading stub:
-  // Replace this with a signed Coinbase Advanced Trade order request
-  // using COINBASE_API_KEY and COINBASE_API_SECRET in Worker secrets.
   throw new Error('Live Coinbase order placement is not implemented yet.');
 }

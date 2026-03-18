@@ -313,7 +313,7 @@ export class BotDurableObject extends DurableObject<Env> {
     if (side === 'SELL') {
       await closeOpenPosition(this.env, {
         exit_reason: 'manual_trade_sell',
-        last_price: fillPrice || this.stateData.lastStatus?.lastPrice ?? null,
+        last_price: (fillPrice || this.stateData.lastStatus?.lastPrice) ?? null,
         realized_pnl: 0
       });
     }

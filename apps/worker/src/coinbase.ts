@@ -11,26 +11,106 @@ export interface TickerSnapshot {
   timestamp: string;
 }
 
-export async function fetchPublicTicker(asset: Asset): Promise<TickerSnapshot> {
-  // Replace with real Coinbase Advanced Trade REST or WS integration.
-  const price = asset === 'ETH-USD' ? 3650 : 0.028;
+type CoinbaseBestBidAskResponse = {
+  pricebooks?: Array<{
+    product_id: string;
+    bids?: Array<{ price: string; size: string }>;
+    asks?: Array<{ price: string; size: string }>;
+    time?: string;
+  }>;
+};
+
+async function fetchBestBidAsk(productId: string) {
+  const url = `https://api.coinbase.com/api/v3/brokerage/best_bid_ask?product_ids=${encodeURIComponent(productId)}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Coinbase best_bid_ask failed: ${res.status}`);
+  }
+
+  const data = (await res.json()) as CoinbaseBestBidAskResponse;
+  const book = data.pricebooks?.[0];
+
+  if (!book) {
+    throw new Error(`No pricebook returned for ${productId}`);
+  }
+
+  const bestBid = Number(book.bids?.[0]?.price ?? 0);
+  const bestAsk = Number(book.asks?.[0]?.price ?? 0);
+  const bidDepth = Number(book.bids?.[0]?.size ?? 0);
+  const askDepth = Number(book.asks?.[0]?.size ?? 0);
+
+  if (!bestBid || !bestAsk) {
+    throw new Error(`Invalid bid/ask for ${productId}`);
+  }
+
   return {
-    productId: asset,
-    price,
-    bestBid: price * 0.9995,
-    bestAsk: price * 1.0005,
-    bidDepth: asset === 'ETH-USD' ? 100000 : 15000,
-    askDepth: asset === 'ETH-USD' ? 98000 : 14500,
-    benchmarkPrice: asset === 'ETH-USD' ? 64000 : 3650,
-    timestamp: new Date().toISOString()
+    bestBid,
+    bestAsk,
+    bidDepth,
+    askDepth,
+    timestamp: book.time ?? new Date().toISOString()
   };
 }
 
-export async function placeCoinbaseOrder(_params: { side: 'BUY' | 'SELL'; asset: Asset; notionalUsd: number; mode: 'paper' | 'live' }) {
-  // Replace with signed Advanced Trade order call.
+async function fetchBenchmarkPrice(productId: 'BTC-USD' | 'ETH-USD') {
+  const data = await fetchBestBidAsk(productId);
+  return (data.bestBid + data.bestAsk) / 2;
+}
+
+export async function fetchPublicTicker(asset: Asset): Promise<TickerSnapshot> {
+  const book = await fetchBestBidAsk(asset);
+  const price = (book.bestBid + book.bestAsk) / 2;
+
+  const benchmarkAsset: 'BTC-USD' | 'ETH-USD' =
+    asset === 'ETH-USD' ? 'BTC-USD' : 'ETH-USD';
+
+  let benchmarkPrice = price;
+  try {
+    benchmarkPrice = await fetchBenchmarkPrice(benchmarkAsset);
+  } catch {
+    benchmarkPrice = asset === 'ETH-USD' ? 60000 : 3500;
+  }
+
   return {
-    success: true,
-    exchangeOrderId: crypto.randomUUID(),
-    status: 'FILLED'
+    productId: asset,
+    price,
+    bestBid: book.bestBid,
+    bestAsk: book.bestAsk,
+    bidDepth: book.bidDepth,
+    askDepth: book.askDepth,
+    benchmarkPrice,
+    timestamp: book.timestamp
   };
+}
+
+export async function placeCoinbaseOrder(params: {
+  side: 'BUY' | 'SELL';
+  asset: Asset;
+  notionalUsd: number;
+  mode: 'paper' | 'live';
+}) {
+  if (params.mode === 'paper') {
+    return {
+      success: true,
+      exchangeOrderId: crypto.randomUUID(),
+      status: 'FILLED',
+      price: null,
+      quantity: null,
+      avgFillPrice: null,
+      filledQuantity: null,
+      feeUsd: 0,
+      slippageUsd: 0
+    };
+  }
+
+  // Live trading stub:
+  // Replace this with a signed Coinbase Advanced Trade order request
+  // using COINBASE_API_KEY and COINBASE_API_SECRET in Worker secrets.
+  throw new Error('Live Coinbase order placement is not implemented yet.');
 }

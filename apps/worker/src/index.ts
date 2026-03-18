@@ -21,6 +21,11 @@ app.use(
   })
 );
 
+// Important: explicitly answer browser preflight requests
+app.options('*', (c) => {
+  return c.text('', 204);
+});
+
 function botStub(env: Env) {
   const id = env.BOT_DO.idFromName('primary-bot');
   return env.BOT_DO.get(id);
@@ -56,7 +61,9 @@ app.get('/api/status', authRequired, async (c) => {
 });
 
 app.post('/api/tick', authRequired, async (c) => {
-  return proxyToBot(c.env, 'https://bot/tick', { method: 'POST' });
+  return proxyToBot(c.env, 'https://bot/tick', {
+    method: 'POST'
+  });
 });
 
 app.get('/api/settings', authRequired, async (c) => {

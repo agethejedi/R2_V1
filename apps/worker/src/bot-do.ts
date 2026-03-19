@@ -78,8 +78,8 @@ export class BotDurableObject extends DurableObject<Env> {
     }
 
     if (url.pathname.endsWith('/status') && request.method === 'GET') {
-  return Response.json(await this.tick());
-}
+      return Response.json(await this.tick());
+    }
 
     if (url.pathname.endsWith('/trade') && request.method === 'POST') {
       const body = await request.json<{ side: 'BUY' | 'SELL'; notionalUsd: number }>();
@@ -141,7 +141,30 @@ export class BotDurableObject extends DurableObject<Env> {
     const liveSwitchEnabled = Boolean(settings?.live_switch_enabled);
     const killSwitchEnabled = Boolean(settings?.kill_switch_enabled);
 
-    const snapshot = await fetchPublicTicker(asset);
+    let snapshot;
+    try {
+      snapshot = await fetchPublicTicker(asset);
+    } catch (err) {
+      await writeLog(this.env, 'error', 'tick', 'fetchPublicTicker failed', {
+        asset,
+        error: err instanceof Error ? err.message : String(err)
+      });
+
+      const fallbackPrice =
+        this.stateData.lastStatus?.lastPrice ??
+        (asset === 'ETH-USD' ? 2500 : 0.03);
+
+      snapshot = {
+        productId: asset,
+        price: fallbackPrice,
+        bestBid: fallbackPrice * 0.9995,
+        bestAsk: fallbackPrice * 1.0005,
+        bidDepth: 1000,
+        askDepth: 1000,
+        benchmarkPrice: asset === 'ETH-USD' ? 60000 : 2500,
+        timestamp: new Date().toISOString()
+      };
+    }
 
     this.stateData.prices.push(snapshot.price);
     this.stateData.volumes.push(Math.max(1, snapshot.bidDepth + snapshot.askDepth));
@@ -273,25 +296,36 @@ export class BotDurableObject extends DurableObject<Env> {
       mode
     });
 
+    const fillPrice = Number(
+      result?.avgFillPrice ??
+      result?.price ??
+      this.stateData.lastStatus?.lastPrice ??
+      0
+    );
+
+    const quantity =
+      Number(result?.filledQuantity ?? result?.quantity ?? 0) ||
+      (fillPrice > 0 ? notionalUsd / fillPrice : 0);
+
+    const orderStatus = result?.status ?? 'FILLED';
+
     await insertOrder(this.env, {
-      exchange_order_id: result?.orderId ?? null,
+      exchange_order_id:
+        result?.exchangeOrderId ??
+        result?.exchange_order_id ??
+        null,
       asset,
       mode,
       side,
       order_type: 'MARKET',
       requested_notional_usd: notionalUsd,
-      requested_quantity: result?.quantity ?? null,
-      filled_quantity: result?.filledQuantity ?? result?.quantity ?? null,
-      avg_fill_price: result?.avgFillPrice ?? result?.price ?? null,
-      fee_usd: result?.feeUsd ?? 0,
-      slippage_usd: result?.slippageUsd ?? 0,
-      status: result?.status ?? 'FILLED'
+      requested_quantity: quantity || null,
+      filled_quantity: quantity || null,
+      avg_fill_price: fillPrice || null,
+      fee_usd: Number(result?.feeUsd ?? 0),
+      slippage_usd: Number(result?.slippageUsd ?? 0),
+      status: orderStatus
     });
-
-    const fillPrice = Number(result?.avgFillPrice ?? result?.price ?? 0);
-    const quantity =
-      Number(result?.filledQuantity ?? result?.quantity ?? 0) ||
-      (fillPrice > 0 ? notionalUsd / fillPrice : 0);
 
     if (side === 'BUY' && fillPrice > 0 && quantity > 0) {
       await upsertPosition(this.env, {
@@ -308,13 +342,26 @@ export class BotDurableObject extends DurableObject<Env> {
         unrealized_pnl: 0,
         entry_reason: 'manual_trade'
       });
+
+      await writeLog(this.env, 'info', 'positions', 'position opened', {
+        asset,
+        mode,
+        quantity,
+        fillPrice
+      });
     }
 
     if (side === 'SELL') {
       await closeOpenPosition(this.env, {
         exit_reason: 'manual_trade_sell',
-        last_price: (fillPrice || this.stateData.lastStatus?.lastPrice) ?? null,
+        last_price: fillPrice || this.stateData.lastStatus?.lastPrice || null,
         realized_pnl: 0
+      });
+
+      await writeLog(this.env, 'info', 'positions', 'position closed', {
+        asset,
+        mode,
+        fillPrice
       });
     }
 
@@ -346,4 +393,3 @@ export class BotDurableObject extends DurableObject<Env> {
     }
   }
 }
-

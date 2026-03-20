@@ -3,6 +3,7 @@ import { buildCommentary } from './commentary';
 import { fetchPublicTicker, placeCoinbaseOrder } from './coinbase';
 import {
   closeOpenPosition,
+  getOpenPosition,
   getSettings,
   insertDecision,
   insertOrder,
@@ -95,14 +96,27 @@ export class BotDurableObject extends DurableObject<Env> {
 
     if (url.pathname.endsWith('/close-position') && request.method === 'POST') {
       const status = this.stateData.lastStatus;
+      const open = await getOpenPosition(this.env);
+
+      let realizedPnl = 0;
+      if (open && typeof open === 'object') {
+        const avgEntry = Number((open as Record<string, unknown>).avg_entry_price ?? 0);
+        const qty = Number((open as Record<string, unknown>).quantity ?? 0);
+        const exitPrice = Number(status?.lastPrice ?? 0);
+        realizedPnl = qty > 0 && avgEntry > 0 && exitPrice > 0
+          ? (exitPrice - avgEntry) * qty
+          : 0;
+      }
+
       const closed = await closeOpenPosition(this.env, {
         exit_reason: 'manual_close',
         last_price: status?.lastPrice ?? null,
-        realized_pnl: 0
+        realized_pnl: realizedPnl
       });
 
       await writeLog(this.env, 'info', 'positions', 'manual close position requested', {
-        closed
+        closed,
+        realizedPnl
       });
 
       return Response.json({
@@ -113,9 +127,7 @@ export class BotDurableObject extends DurableObject<Env> {
 
     if (url.pathname.endsWith('/reset-risk') && request.method === 'POST') {
       const result = await resetDailyRisk(this.env);
-
       await writeLog(this.env, 'info', 'risk', 'daily risk reset', result);
-
       return Response.json(result);
     }
 
@@ -220,6 +232,43 @@ export class BotDurableObject extends DurableObject<Env> {
       mode !== 'paused' &&
       signalScore >= threshold &&
       !(mode === 'live' && !liveSwitchEnabled);
+
+    // Mark-to-market open position
+    const open = await getOpenPosition(this.env);
+    if (open && typeof open === 'object') {
+      const openPos = open as Record<string, unknown>;
+      const avgEntry = Number(openPos.avg_entry_price ?? 0);
+      const qty = Number(openPos.quantity ?? 0);
+      const currentPrice = Number(snapshot.price ?? 0);
+      const peakPrice = Math.max(
+        Number(openPos.peak_price ?? 0),
+        currentPrice
+      );
+
+      const unrealizedPnl =
+        qty > 0 && avgEntry > 0 && currentPrice > 0
+          ? (currentPrice - avgEntry) * qty
+          : 0;
+
+      await upsertPosition(this.env, {
+        id: String(openPos.id),
+        asset: String(openPos.asset ?? asset),
+        mode: String(openPos.mode ?? mode),
+        quantity: qty,
+        avg_entry_price: avgEntry,
+        stop_price: Number(openPos.stop_price ?? 0) || null,
+        target_price: Number(openPos.target_price ?? 0) || null,
+        peak_price: peakPrice || null,
+        last_price: currentPrice || null,
+        status: String(openPos.status ?? 'OPEN'),
+        realized_pnl: Number(openPos.realized_pnl ?? 0),
+        unrealized_pnl: unrealizedPnl,
+        entry_reason: String(openPos.entry_reason ?? 'manual_trade'),
+        exit_reason: openPos.exit_reason ? String(openPos.exit_reason) : null,
+        opened_at: String(openPos.opened_at ?? new Date().toISOString()),
+        closed_at: openPos.closed_at ? String(openPos.closed_at) : null
+      });
+    }
 
     const commentary = buildCommentary({
       asset,
@@ -352,16 +401,29 @@ export class BotDurableObject extends DurableObject<Env> {
     }
 
     if (side === 'SELL') {
+      const open = await getOpenPosition(this.env);
+
+      let realizedPnl = 0;
+      if (open && typeof open === 'object') {
+        const avgEntry = Number((open as Record<string, unknown>).avg_entry_price ?? 0);
+        const qty = Number((open as Record<string, unknown>).quantity ?? 0);
+        realizedPnl =
+          qty > 0 && avgEntry > 0 && fillPrice > 0
+            ? (fillPrice - avgEntry) * qty
+            : 0;
+      }
+
       await closeOpenPosition(this.env, {
         exit_reason: 'manual_trade_sell',
         last_price: fillPrice || this.stateData.lastStatus?.lastPrice || null,
-        realized_pnl: 0
+        realized_pnl: realizedPnl
       });
 
       await writeLog(this.env, 'info', 'positions', 'position closed', {
         asset,
         mode,
-        fillPrice
+        fillPrice,
+        realizedPnl
       });
     }
 

@@ -1,5 +1,12 @@
 'use client';
 
+function fmt(n: any, decimals = 2) {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return '—';
+  return num.toFixed(decimals);
+}
+
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '../components/Card';
 import { ControlsPanel } from '../components/ControlsPanel';
@@ -157,11 +164,11 @@ export default function HomePage() {
           <tr key={p.id}>
             <td>{p.asset}</td>
             <td>{p.status}</td>
-            <td>{p.avg_entry_price}</td>
-            <td>{p.last_price ?? '—'}</td>
-            <td>{p.quantity ?? '—'}</td>
-            <td>{p.unrealized_pnl ?? 0}</td>
-            <td>{p.realized_pnl ?? 0}</td>
+            <td>{fmt(p.avg_entry_price, 2)}</td>
+<td>{fmt(p.last_price, 2)}</td>
+<td>{fmt(p.quantity, 6)}</td>
+<td>{fmt(p.unrealized_pnl, 2)}</td>
+<td>{fmt(p.realized_pnl, 2)}</td>
           </tr>
         ))
       ) : (

@@ -139,33 +139,39 @@ export default function HomePage() {
         </Card>
 
         <Card title="Recent Positions" className="span-6">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Status</th>
-                <th>Entry</th>
-                <th>Unrealized</th>
-              </tr>
-            </thead>
-            <tbody>
-              {positions.length ? (
-                positions.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.asset}</td>
-                    <td>{p.status}</td>
-                    <td>{p.avg_entry_price}</td>
-                    <td>{p.unrealized_pnl}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4}>No positions yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </Card>
+  <table className="table">
+    <thead>
+      <tr>
+        <th>Asset</th>
+        <th>Status</th>
+        <th>Entry</th>
+        <th>Last</th>
+        <th>Qty</th>
+        <th>Unrealized</th>
+        <th>Realized</th>
+      </tr>
+    </thead>
+    <tbody>
+      {positions.length ? (
+        positions.map((p) => (
+          <tr key={p.id}>
+            <td>{p.asset}</td>
+            <td>{p.status}</td>
+            <td>{p.avg_entry_price}</td>
+            <td>{p.last_price ?? '—'}</td>
+            <td>{p.quantity ?? '—'}</td>
+            <td>{p.unrealized_pnl ?? 0}</td>
+            <td>{p.realized_pnl ?? 0}</td>
+          </tr>
+        ))
+      ) : (
+        <tr>
+          <td colSpan={7}>No positions yet.</td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+</Card>
 
         <Card title="Recent Orders" className="span-6">
           <table className="table">

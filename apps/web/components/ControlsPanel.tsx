@@ -31,19 +31,32 @@ const defaultActionState: ActionState = {
   error: ''
 };
 
-export function ControlsPanel({ token }: { token: string }) {
+export function ControlsPanel({
+  token,
+  onRefresh
+}: {
+  token: string;
+  onRefresh?: () => void;
+}) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [manualTradeUsd, setManualTradeUsd] = useState(25);
+
   const [saveState, setSaveState] = useState<ActionState>(defaultActionState);
   const [tickState, setTickState] = useState<ActionState>(defaultActionState);
   const [closeState, setCloseState] = useState<ActionState>(defaultActionState);
   const [resetState, setResetState] = useState<ActionState>(defaultActionState);
+  const [buyState, setBuyState] = useState<ActionState>(defaultActionState);
+  const [sellState, setSellState] = useState<ActionState>(defaultActionState);
 
   async function loadSettings() {
     setLoadingSettings(true);
     try {
       const data = await apiFetch('/api/settings', token);
       setSettings(data);
+      if (typeof data?.max_trade_amount_usd === 'number') {
+        setManualTradeUsd(data.max_trade_amount_usd);
+      }
     } catch (err) {
       console.error('Failed to load settings', err);
     } finally {
@@ -94,6 +107,7 @@ export function ControlsPanel({ token }: { token: string }) {
         message: 'Settings saved successfully.',
         error: ''
       });
+      onRefresh?.();
     } catch (err) {
       console.error(err);
       setSaveState({
@@ -117,6 +131,7 @@ export function ControlsPanel({ token }: { token: string }) {
         message: 'Tick executed.',
         error: ''
       });
+      onRefresh?.();
     } catch (err) {
       console.error(err);
       setTickState({
@@ -140,6 +155,7 @@ export function ControlsPanel({ token }: { token: string }) {
         message: 'Close position request sent.',
         error: ''
       });
+      onRefresh?.();
     } catch (err) {
       console.error(err);
       setCloseState({
@@ -163,12 +179,54 @@ export function ControlsPanel({ token }: { token: string }) {
         message: 'Daily risk reset.',
         error: ''
       });
+      onRefresh?.();
     } catch (err) {
       console.error(err);
       setResetState({
         loading: false,
         message: '',
         error: 'Failed to reset daily risk.'
+      });
+    }
+  }
+
+  async function submitTrade(side: 'BUY' | 'SELL') {
+    const usd = Number(manualTradeUsd);
+
+    if (!usd || usd <= 0) {
+      const setter = side === 'BUY' ? setBuyState : setSellState;
+      setter({
+        loading: false,
+        message: '',
+        error: 'Manual trade amount must be greater than zero.'
+      });
+      return;
+    }
+
+    const setter = side === 'BUY' ? setBuyState : setSellState;
+    setter({ loading: true, message: '', error: '' });
+
+    try {
+      await apiFetch('/api/trade', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          side,
+          notionalUsd: usd
+        })
+      });
+
+      setter({
+        loading: false,
+        message: `${side} order submitted.`,
+        error: ''
+      });
+      onRefresh?.();
+    } catch (err) {
+      console.error(err);
+      setter({
+        loading: false,
+        message: '',
+        error: `Failed to submit ${side} order.`
       });
     }
   }
@@ -322,6 +380,15 @@ export function ControlsPanel({ token }: { token: string }) {
             <option value="bot">bot</option>
           </select>
         </label>
+
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span>Manual Trade Amount (USD)</span>
+          <input
+            type="number"
+            value={manualTradeUsd}
+            onChange={(e) => setManualTradeUsd(Number(e.target.value))}
+          />
+        </label>
       </div>
 
       <div
@@ -371,6 +438,14 @@ export function ControlsPanel({ token }: { token: string }) {
           {tickState.loading ? 'Running…' : 'Run Tick'}
         </button>
 
+        <button onClick={() => submitTrade('BUY')} disabled={buyState.loading}>
+          {buyState.loading ? 'Buying…' : 'Buy'}
+        </button>
+
+        <button onClick={() => submitTrade('SELL')} disabled={sellState.loading}>
+          {sellState.loading ? 'Selling…' : 'Sell'}
+        </button>
+
         <button onClick={closePosition} disabled={closeState.loading}>
           {closeState.loading ? 'Closing…' : 'Close Position'}
         </button>
@@ -386,6 +461,12 @@ export function ControlsPanel({ token }: { token: string }) {
 
         {tickState.message ? <p style={{ color: '#16a34a' }}>{tickState.message}</p> : null}
         {tickState.error ? <p style={{ color: '#dc2626' }}>{tickState.error}</p> : null}
+
+        {buyState.message ? <p style={{ color: '#16a34a' }}>{buyState.message}</p> : null}
+        {buyState.error ? <p style={{ color: '#dc2626' }}>{buyState.error}</p> : null}
+
+        {sellState.message ? <p style={{ color: '#16a34a' }}>{sellState.message}</p> : null}
+        {sellState.error ? <p style={{ color: '#dc2626' }}>{sellState.error}</p> : null}
 
         {closeState.message ? <p style={{ color: '#16a34a' }}>{closeState.message}</p> : null}
         {closeState.error ? <p style={{ color: '#dc2626' }}>{closeState.error}</p> : null}

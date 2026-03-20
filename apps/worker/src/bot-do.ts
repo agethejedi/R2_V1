@@ -42,6 +42,16 @@ const THRESHOLDS: Record<Aggressiveness, number> = {
   aggressive: 50
 };
 
+function calcUnrealizedPnl(avgEntry: number, lastPrice: number, qty: number) {
+  if (!(avgEntry > 0) || !(lastPrice > 0) || !(qty > 0)) return 0;
+  return (lastPrice - avgEntry) * qty;
+}
+
+function calcReturnPct(avgEntry: number, lastPrice: number) {
+  if (!(avgEntry > 0) || !(lastPrice > 0)) return 0;
+  return ((lastPrice - avgEntry) / avgEntry) * 100;
+}
+
 export class BotDurableObject extends DurableObject<Env> {
   stateData: BotState = {
     prices: [],
@@ -99,13 +109,14 @@ export class BotDurableObject extends DurableObject<Env> {
       const open = await getOpenPosition(this.env);
 
       let realizedPnl = 0;
+
       if (open && typeof open === 'object') {
-        const avgEntry = Number((open as Record<string, unknown>).avg_entry_price ?? 0);
-        const qty = Number((open as Record<string, unknown>).quantity ?? 0);
+        const openPos = open as Record<string, unknown>;
+        const avgEntry = Number(openPos.avg_entry_price ?? 0);
+        const qty = Number(openPos.quantity ?? 0);
         const exitPrice = Number(status?.lastPrice ?? 0);
-        realizedPnl = qty > 0 && avgEntry > 0 && exitPrice > 0
-          ? (exitPrice - avgEntry) * qty
-          : 0;
+
+        realizedPnl = calcUnrealizedPnl(avgEntry, exitPrice, qty);
       }
 
       const closed = await closeOpenPosition(this.env, {
@@ -127,7 +138,9 @@ export class BotDurableObject extends DurableObject<Env> {
 
     if (url.pathname.endsWith('/reset-risk') && request.method === 'POST') {
       const result = await resetDailyRisk(this.env);
+
       await writeLog(this.env, 'info', 'risk', 'daily risk reset', result);
+
       return Response.json(result);
     }
 
@@ -245,10 +258,7 @@ export class BotDurableObject extends DurableObject<Env> {
         currentPrice
       );
 
-      const unrealizedPnl =
-        qty > 0 && avgEntry > 0 && currentPrice > 0
-          ? (currentPrice - avgEntry) * qty
-          : 0;
+      const unrealizedPnl = calcUnrealizedPnl(avgEntry, currentPrice, qty);
 
       await upsertPosition(this.env, {
         id: String(openPos.id),
@@ -407,10 +417,7 @@ export class BotDurableObject extends DurableObject<Env> {
       if (open && typeof open === 'object') {
         const avgEntry = Number((open as Record<string, unknown>).avg_entry_price ?? 0);
         const qty = Number((open as Record<string, unknown>).quantity ?? 0);
-        realizedPnl =
-          qty > 0 && avgEntry > 0 && fillPrice > 0
-            ? (fillPrice - avgEntry) * qty
-            : 0;
+        realizedPnl = calcUnrealizedPnl(avgEntry, fillPrice, qty);
       }
 
       await closeOpenPosition(this.env, {
@@ -423,7 +430,13 @@ export class BotDurableObject extends DurableObject<Env> {
         asset,
         mode,
         fillPrice,
-        realizedPnl
+        realizedPnl,
+        returnPct: open && typeof open === 'object'
+          ? calcReturnPct(
+              Number((open as Record<string, unknown>).avg_entry_price ?? 0),
+              fillPrice
+            )
+          : 0
       });
     }
 

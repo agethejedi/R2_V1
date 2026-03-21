@@ -6,6 +6,52 @@ function fmt(n: any, decimals = 2) {
   return num.toFixed(decimals);
 }
 
+<Card title="Recent Positions" className="span-6">
+  <table className="table">
+    <thead>
+      <tr>
+        <th>Asset</th>
+        <th>Status</th>
+        <th>Entry</th>
+        <th>Last</th>
+        <th>Qty</th>
+        <th>Unrealized</th>
+        <th>Realized</th>
+        <th>% Return</th>
+      </tr>
+    </thead>
+    <tbody>
+      {positions.length ? (
+        positions.map((p) => {
+          const returnPct = calcReturnPct(p);
+
+          return (
+            <tr key={p.id}>
+              <td>{p.asset}</td>
+              <td>{p.status}</td>
+              <td>{fmt(p.avg_entry_price, 2)}</td>
+              <td>{fmt(p.last_price, 5)}</td>
+              <td>{fmt(p.quantity, 6)}</td>
+              <td style={{ color: pnlColor(p.unrealized_pnl) }}>
+                {fmt(p.unrealized_pnl, 2)}
+              </td>
+              <td style={{ color: pnlColor(p.realized_pnl) }}>
+                {fmt(p.realized_pnl, 2)}
+              </td>
+              <td style={{ color: pnlColor(returnPct) }}>
+                {fmt(returnPct, 2)}%
+              </td>
+            </tr>
+          );
+        })
+      ) : (
+        <tr>
+          <td colSpan={8}>No positions yet.</td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+</Card>
 
 import React, { useEffect, useState } from 'react';
 import { Card } from '../components/Card';
@@ -156,31 +202,41 @@ export default function HomePage() {
         <th>Qty</th>
         <th>Unrealized</th>
         <th>Realized</th>
+        <th>% Return</th>
       </tr>
     </thead>
     <tbody>
       {positions.length ? (
-        positions.map((p) => (
-          <tr key={p.id}>
-            <td>{p.asset}</td>
-            <td>{p.status}</td>
-            <td>{fmt(p.avg_entry_price, 2)}</td>
-<td>{fmt(p.last_price, 2)}</td>
-<td>{fmt(p.quantity, 6)}</td>
-<td>{fmt(p.unrealized_pnl, 2)}</td>
-<td>{fmt(p.realized_pnl, 2)}</td>
-          </tr>
-        ))
+        positions.map((p) => {
+          const returnPct = calcReturnPct(p);
+
+          return (
+            <tr key={p.id}>
+              <td>{p.asset}</td>
+              <td>{p.status}</td>
+              <td>{fmt(p.avg_entry_price, 2)}</td>
+              <td>{fmt(p.last_price, 5)}</td>
+              <td>{fmt(p.quantity, 6)}</td>
+              <td style={{ color: pnlColor(p.unrealized_pnl) }}>
+                {fmt(p.unrealized_pnl, 2)}
+              </td>
+              <td style={{ color: pnlColor(p.realized_pnl) }}>
+                {fmt(p.realized_pnl, 2)}
+              </td>
+              <td style={{ color: pnlColor(returnPct) }}>
+                {fmt(returnPct, 2)}%
+              </td>
+            </tr>
+          );
+        })
       ) : (
         <tr>
-          <td colSpan={7}>No positions yet.</td>
+          <td colSpan={8}>No positions yet.</td>
         </tr>
       )}
     </tbody>
   </table>
-</Card>
-
-        <Card title="Recent Orders" className="span-6">
+</Card>        <Card title="Recent Orders" className="span-6">
           <table className="table">
             <thead>
               <tr>

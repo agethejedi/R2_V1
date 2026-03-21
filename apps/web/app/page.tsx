@@ -1,62 +1,39 @@
 'use client';
 
+import React, { useEffect, useState } from 'react';
+import { Card } from '../components/Card';
+import { ControlsPanel } from '../components/ControlsPanel';
+import { apiFetch } from '../lib/api';
+
 function fmt(n: any, decimals = 2) {
   const num = Number(n);
   if (!Number.isFinite(num)) return '—';
   return num.toFixed(decimals);
 }
 
-<Card title="Recent Positions" className="span-6">
-  <table className="table">
-    <thead>
-      <tr>
-        <th>Asset</th>
-        <th>Status</th>
-        <th>Entry</th>
-        <th>Last</th>
-        <th>Qty</th>
-        <th>Unrealized</th>
-        <th>Realized</th>
-        <th>% Return</th>
-      </tr>
-    </thead>
-    <tbody>
-      {positions.length ? (
-        positions.map((p) => {
-          const returnPct = calcReturnPct(p);
+function pnlColor(n: any) {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return undefined;
+  if (num > 0) return '#16a34a';
+  if (num < 0) return '#dc2626';
+  return undefined;
+}
 
-          return (
-            <tr key={p.id}>
-              <td>{p.asset}</td>
-              <td>{p.status}</td>
-              <td>{fmt(p.avg_entry_price, 2)}</td>
-              <td>{fmt(p.last_price, 5)}</td>
-              <td>{fmt(p.quantity, 6)}</td>
-              <td style={{ color: pnlColor(p.unrealized_pnl) }}>
-                {fmt(p.unrealized_pnl, 2)}
-              </td>
-              <td style={{ color: pnlColor(p.realized_pnl) }}>
-                {fmt(p.realized_pnl, 2)}
-              </td>
-              <td style={{ color: pnlColor(returnPct) }}>
-                {fmt(returnPct, 2)}%
-              </td>
-            </tr>
-          );
-        })
-      ) : (
-        <tr>
-          <td colSpan={8}>No positions yet.</td>
-        </tr>
-      )}
-    </tbody>
-  </table>
-</Card>
+function calcReturnPct(position: any) {
+  const entry = Number(position?.avg_entry_price ?? 0);
+  const qty = Number(position?.quantity ?? 0);
 
-import React, { useEffect, useState } from 'react';
-import { Card } from '../components/Card';
-import { ControlsPanel } from '../components/ControlsPanel';
-import { apiFetch } from '../lib/api';
+  if (!(entry > 0) || !(qty > 0)) return 0;
+
+  const basis = entry * qty;
+  const pnl =
+    position?.status === 'OPEN'
+      ? Number(position?.unrealized_pnl ?? 0)
+      : Number(position?.realized_pnl ?? 0);
+
+  if (!(basis > 0)) return 0;
+  return (pnl / basis) * 100;
+}
 
 export default function HomePage() {
   const [token, setToken] = useState('');
@@ -154,7 +131,7 @@ export default function HomePage() {
     <div className="container">
       <h1>IOTX / ETH Coinbase Bot</h1>
 
-      <ControlsPanel token={token} />
+      <ControlsPanel token={token} onRefresh={() => loadDashboard(token)} />
 
       <div className="grid">
         <Card title="Current Regime" className="span-4">
@@ -192,51 +169,53 @@ export default function HomePage() {
         </Card>
 
         <Card title="Recent Positions" className="span-6">
-  <table className="table">
-    <thead>
-      <tr>
-        <th>Asset</th>
-        <th>Status</th>
-        <th>Entry</th>
-        <th>Last</th>
-        <th>Qty</th>
-        <th>Unrealized</th>
-        <th>Realized</th>
-        <th>% Return</th>
-      </tr>
-    </thead>
-    <tbody>
-      {positions.length ? (
-        positions.map((p) => {
-          const returnPct = calcReturnPct(p);
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Status</th>
+                <th>Entry</th>
+                <th>Last</th>
+                <th>Qty</th>
+                <th>Unrealized</th>
+                <th>Realized</th>
+                <th>% Return</th>
+              </tr>
+            </thead>
+            <tbody>
+              {positions.length ? (
+                positions.map((p) => {
+                  const returnPct = calcReturnPct(p);
 
-          return (
-            <tr key={p.id}>
-              <td>{p.asset}</td>
-              <td>{p.status}</td>
-              <td>{fmt(p.avg_entry_price, 2)}</td>
-              <td>{fmt(p.last_price, 5)}</td>
-              <td>{fmt(p.quantity, 6)}</td>
-              <td style={{ color: pnlColor(p.unrealized_pnl) }}>
-                {fmt(p.unrealized_pnl, 2)}
-              </td>
-              <td style={{ color: pnlColor(p.realized_pnl) }}>
-                {fmt(p.realized_pnl, 2)}
-              </td>
-              <td style={{ color: pnlColor(returnPct) }}>
-                {fmt(returnPct, 2)}%
-              </td>
-            </tr>
-          );
-        })
-      ) : (
-        <tr>
-          <td colSpan={8}>No positions yet.</td>
-        </tr>
-      )}
-    </tbody>
-  </table>
-</Card>        <Card title="Recent Orders" className="span-6">
+                  return (
+                    <tr key={p.id}>
+                      <td>{p.asset}</td>
+                      <td>{p.status}</td>
+                      <td>{fmt(p.avg_entry_price, 2)}</td>
+                      <td>{fmt(p.last_price, 5)}</td>
+                      <td>{fmt(p.quantity, 6)}</td>
+                      <td style={{ color: pnlColor(p.unrealized_pnl) }}>
+                        {fmt(p.unrealized_pnl, 2)}
+                      </td>
+                      <td style={{ color: pnlColor(p.realized_pnl) }}>
+                        {fmt(p.realized_pnl, 2)}
+                      </td>
+                      <td style={{ color: pnlColor(returnPct) }}>
+                        {fmt(returnPct, 2)}%
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={8}>No positions yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card title="Recent Orders" className="span-6">
           <table className="table">
             <thead>
               <tr>

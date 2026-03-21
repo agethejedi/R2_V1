@@ -434,6 +434,7 @@ export async function closeOpenPosition(
       exit_reason = ?,
       last_price = ?,
       realized_pnl = ?,
+      unrealized_pnl = 0,
       closed_at = ?
      WHERE id = ?`
   )
